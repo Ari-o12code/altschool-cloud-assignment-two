@@ -1,58 +1,92 @@
 # altschool-cloud-assignment-two
 
-> 1. 
+> 1. check_disk_usage.sh
 ```
 #!/bin/bash
 
-# Set default number of entries
-entries=8
+# Define default number of entries
+DEFAULT_ENTRIES=8
 
-# Check for optional -n argument
-if [[ "$1" =~ ^-n ]]; then
-  # Extract number of entries if provided
-  entries=${1#?n}
-  shift
-fi
+# Parse arguments
+while getopts ":d:n:" opt; do
+  case $opt in
+    d)
+      # Set flag for detailed listing
+      LIST_DETAILS=true
+      ;;
+    n)
+      # Set number of entries from argument
+      NUM_ENTRIES=$OPTARG
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# Shift arguments to remove options
+shift $((OPTIND-1))
 
 # Check if directory argument is provided
-if [ $# -eq 0 ]; then
-  echo "Error: No directory specified"
+if [[ $# -eq 0 ]]; then
+  echo "Error: Please provide a directory to check." >&2
   exit 1
 fi
 
 # Get directory path
 dir_path="$1"
 
-# Use du to get disk usage, top entries by default
-disk_usage=$(du -h -s "$dir_path" | head -n "$entries")
+# Use `du` command with appropriate options
+if [[ $LIST_DETAILS ]]; then
+  # List details (files and directories)
+  command="du -sh"
+else
+  # Summarize disk usage by directory
+  command="du -s"
+fi
 
-# Print disk usage
-echo "$disk_usage"
+# Add path argument
+command="$command $dir_path/*"
+
+# Sort by size (descending) and potentially limit entries
+sorted_output=$(eval "$command" | sort -nr | head -n "${NUM_ENTRIES:-$DEFAULT_ENTRIES}")
+
+# Print results
+echo "Top $(( ${NUM_ENTRIES:-$DEFAULT_ENTRIES} )) entries for disk usage in $dir_path:"
+echo "$sorted_output"
 ```
 
 
->2. 
+> 2. create_backup.sh
 ```
 #!/bin/bash
 
 # Check if two arguments are provided
-if [ $# -ne 2 ]; then
-  echo "Error: Usage: backup.sh <source_dir> <destination_dir>"
+if [[ $# -ne 2 ]]; then
+  echo "Error: Please provide source and destination directories." >&2
   exit 1
 fi
 
-# Get source and destination directories
+# Get source and destination paths
 source_dir="$1"
 dest_dir="$2"
 
+# Check if source directory exists
+if [[ ! -d "$source_dir" ]]; then
+  echo "Error: Source directory '$source_dir' does not exist." >&2
+  exit 1
+fi
+
 # Create timestamp for backup filename
-timestamp=$(date +%Y-%m-%d_%H-%M-%S)
+timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
 
-# Create destination directory if it doesn't exist
-mkdir -p "$dest_dir"
+# Build destination filename with timestamp
+dest_file="$dest_dir/backup_$source_dir\_$timestamp.tar.gz"
 
-# Create tar archive with timestamp
-tar -czf "$dest_dir/$source_dir-$timestamp.tar.gz" "$source_dir"
+# Create the backup archive using `tar` command
+tar -czf "$dest_file" "$source_dir"
 
-echo "Backup created: $dest_dir/$source_dir-$timestamp.tar.gz"
+# Print success message
+echo "Backup created successfully: $dest_file"
 ```
